@@ -25,7 +25,6 @@ class AviationDatabase:
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         
-        # Create airports table
         cursor.execute('''
         CREATE TABLE airports (
             icao TEXT PRIMARY KEY,
@@ -40,7 +39,6 @@ class AviationDatabase:
         )
         ''')
         
-        # Create runways table
         cursor.execute('''
         CREATE TABLE runways (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -60,7 +58,7 @@ class AviationDatabase:
         )
         ''')
         
-        # Create navaids table
+        # navaids
         cursor.execute('''
         CREATE TABLE navaids (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -76,7 +74,7 @@ class AviationDatabase:
         )
         ''')
         
-        # Create waypoints table
+        # waypoints
         cursor.execute('''
         CREATE TABLE waypoints (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -88,7 +86,7 @@ class AviationDatabase:
         )
         ''')
         
-        # Create procedures table
+        # procedures
         cursor.execute('''
         CREATE TABLE procedures (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -100,7 +98,7 @@ class AviationDatabase:
         )
         ''')
         
-        # Create procedure_waypoints table
+        # procedure_waypoints
         cursor.execute('''
         CREATE TABLE procedure_waypoints (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -120,7 +118,7 @@ class AviationDatabase:
         )
         ''')
         
-        # Create charts table
+        # charts
         cursor.execute('''
         CREATE TABLE charts (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -133,7 +131,7 @@ class AviationDatabase:
         )
         ''')
         
-        # Create chart_calibration table
+        # chart_calibration
         cursor.execute('''
         CREATE TABLE chart_calibration (
             chart_id INTEGER PRIMARY KEY,
@@ -147,9 +145,6 @@ class AviationDatabase:
         
         conn.commit()
         conn.close()
-        
-        # Add sample data
-        self._add_sample_data()
     
         return sqlite3.connect(self.db_path)
     
