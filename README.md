@@ -70,7 +70,7 @@ python main.py batch --config config/default_config.json --dir path/to/charts/
 
 配置文件使用JSON格式，主要参数包括：
 
-- `backbone`: 使用的骨干网络，可选 "resnet50"、"efficientnet_b3" 等
+- `backbone`: 可选 "resnet50"、"efficientnet_b3" 等
 - `num_control_points`: 控制点数量
 - `transformation_type`: 变换类型，可选 "affine" 或 "perspective"
 - `train_airport`, `val_airport`, `test_airport`: 训练、验证和测试的机场ICAO代码
@@ -94,7 +94,7 @@ python main.py batch --config config/default_config.json --dir path/to/charts/
 - 变换矩阵
 - 控制点坐标
 - 准确度信息
-- 机场ICAO代码（如果有）
+- 机场ICAO代码
 
 ## 可视化
 
@@ -102,15 +102,6 @@ python main.py batch --config config/default_config.json --dir path/to/charts/
 
 - 控制点位置
 - 机场位置
-- 跑道位置
 - 导航台位置
-
-## 注意事项
-
-- 确保航图图像清晰可见
-- 最好使用带有明显参考点（如跑道、导航台）的航图
-- 对于没有明显参考点的航图，推荐使用手动校准方式
-
-## 协议
 
 GPL协议
