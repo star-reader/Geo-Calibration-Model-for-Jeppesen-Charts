@@ -7,8 +7,6 @@ import logging
 logger = logging.getLogger(__name__)
 
 class AviationDatabase:
-    """Handler for aviation database operations."""
-    
     def __init__(self, db_path='database/aviation.db'):
         self.db_path = Path(db_path)
         self._initialize_db()
@@ -22,7 +20,6 @@ class AviationDatabase:
             logger.info(f"Using existing aviation database at {self.db_path}")
     
     def _create_database(self):
-        """Create the database schema."""
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         
         conn = sqlite3.connect(self.db_path)
@@ -154,26 +151,21 @@ class AviationDatabase:
         # Add sample data
         self._add_sample_data()
     
-    def get_connection(self):
-        """Get a connection to the database."""
         return sqlite3.connect(self.db_path)
     
     def get_airports(self):
-        """Get all airports."""
         conn = self.get_connection()
         df = pd.read_sql("SELECT * FROM airports", conn)
         conn.close()
         return df
     
     def get_airport(self, icao):
-        """Get airport by ICAO code."""
         conn = self.get_connection()
         df = pd.read_sql(f"SELECT * FROM airports WHERE icao = '{icao}'", conn)
         conn.close()
         return df
     
     def get_runways(self, airport_icao=None):
-        """Get runways, optionally filtered by airport."""
         conn = self.get_connection()
         query = "SELECT * FROM runways"
         if airport_icao:
@@ -183,7 +175,6 @@ class AviationDatabase:
         return df
     
     def get_charts(self, airport_icao=None, chart_type=None):
-        """Get charts, optionally filtered by airport and type."""
         conn = self.get_connection()
         query = "SELECT * FROM charts"
         filters = []
@@ -202,7 +193,6 @@ class AviationDatabase:
         return df
     
     def get_navaids_near_airport(self, icao, radius_nm=50):
-        """Get navaids near an airport within a specified radius."""
         airport = self.get_airport(icao)
         if airport.empty:
             return pd.DataFrame()
@@ -236,7 +226,6 @@ class AviationDatabase:
         return df
     
     def _haversine(self, lat1, lon1, lat2, lon2):
-        """Calculate distance between points in nautical miles."""
         R = 3440.065  # 海里
         
         lat1, lon1, lat2, lon2 = map(np.radians, [lat1, lon1, lat2, lon2])
@@ -250,7 +239,6 @@ class AviationDatabase:
         return R * c
     
     def save_calibration(self, chart_id, transformation_matrix, reference_points, accuracy_score):
-        """Save chart calibration data."""
         conn = self.get_connection()
         cursor = conn.cursor()
         
@@ -288,7 +276,6 @@ class AviationDatabase:
         return True
     
     def get_calibration(self, chart_id):
-        """Get calibration data for a chart."""
         conn = self.get_connection()
         cursor = conn.cursor()
         
