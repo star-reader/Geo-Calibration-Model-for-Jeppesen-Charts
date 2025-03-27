@@ -22,7 +22,6 @@ from utils.geo_utils import create_transformation_matrix, calculate_transformati
 logger = logging.getLogger(__name__)
 
 class ChartCalibrationTrainer:
-    """航图校准模型训练器"""
     
     def __init__(self, 
                  model: ChartCalibrationModel,
@@ -33,19 +32,6 @@ class ChartCalibrationTrainer:
                  scheduler: torch.optim.lr_scheduler._LRScheduler = None,
                  device: str = 'cuda',
                  config: Dict = None):
-        """
-        初始化训练器
-        
-        参数:
-            model: 航图校准模型
-            train_dataloader: 训练数据加载器
-            val_dataloader: 验证数据加载器
-            criterion: 损失函数
-            optimizer: 优化器
-            scheduler: 学习率调度器
-            device: 计算设备
-            config: 配置字典
-        """
         self.config = config or {}
         self.model = model
         self.train_dataloader = train_dataloader
@@ -72,7 +58,6 @@ class ChartCalibrationTrainer:
         else:
             self.optimizer = optimizer
         
-        # 设置学习率调度器
         if scheduler is None:
             self.scheduler = optim.lr_scheduler.ReduceLROnPlateau(
                 self.optimizer, 
@@ -92,33 +77,23 @@ class ChartCalibrationTrainer:
         
         self.model = self.model.to(self.device)
         
-        # 训练配置
         self.num_epochs = self.config.get('num_epochs', 50)
         self.checkpoint_dir = Path(self.config.get('checkpoint_dir', 'checkpoints'))
         self.checkpoint_dir.mkdir(parents=True, exist_ok=True)
         
-        # 设置TensorBoard
         self.tensorboard_dir = Path(self.config.get('tensorboard_dir', 'runs'))
         self.tensorboard_dir.mkdir(parents=True, exist_ok=True)
         self.writer = SummaryWriter(log_dir=str(self.tensorboard_dir))
         
-        # 训练状态
         self.current_epoch = 0
         self.best_val_loss = float('inf')
         self.best_model_path = None
         
-        # 数据库实例（用于保存校准结果）
         self.db = AviationDatabase()
         
         logger.info("训练器初始化完成")
     
     def train_one_epoch(self) -> Dict[str, float]:
-        """
-        训练一个Epoch
-        
-        返回:
-            包含训练指标的字典
-        """
         self.model.train()
         epoch_loss = 0.0
         epoch_metrics = {
@@ -132,11 +107,9 @@ class ChartCalibrationTrainer:
         progress_bar = tqdm(self.train_dataloader, desc=f"Epoch {self.current_epoch+1}/{self.num_epochs}")
         
         for batch_idx, batch in enumerate(progress_bar):
-            # 准备输入和目标
             images = batch['image'].to(self.device)
             metadata = batch['metadata']
             
-            # 从元数据中提取标注（如果有）
             targets = self._extract_targets_from_metadata(metadata)
             if targets is None:
                 continue  # 跳过没有标注的样本
@@ -144,36 +117,24 @@ class ChartCalibrationTrainer:
             targets = {k: v.to(self.device) if isinstance(v, torch.Tensor) else v 
                        for k, v in targets.items()}
             
-            # 清零梯度
+
             self.optimizer.zero_grad()
-            
-            # 前向传播
             outputs = self.model(images)
-            
-            # 添加模型引用到预测中，用于一致性损失计算
             outputs['model'] = self.model
-            
-            # 计算损失
             loss_dict = self.criterion(outputs, targets)
             loss = loss_dict['total_loss']
-            
-            # 反向传播和优化
             loss.backward()
             self.optimizer.step()
-            
-            # 更新进度条
             progress_bar.set_postfix({
                 'loss': f"{loss.item():.4f}",
                 'point_loss': f"{loss_dict['point_loss'].item():.4f}"
             })
-            
-            # 累加损失
+
             epoch_loss += loss.item()
             for k, v in loss_dict.items():
                 if k in epoch_metrics:
                     epoch_metrics[k] += v.item()
             
-            # 记录到TensorBoard
             global_step = self.current_epoch * num_batches + batch_idx
             self.writer.add_scalar('train/loss', loss.item(), global_step)
             for k, v in loss_dict.items():
@@ -188,12 +149,6 @@ class ChartCalibrationTrainer:
         return epoch_metrics
     
     def validate(self) -> Dict[str, float]:
-        """
-        在验证集上评估模型
-        
-        返回:
-            包含验证指标的字典
-        """
         if self.val_dataloader is None:
             return {'loss': 0.0}
         
@@ -212,11 +167,9 @@ class ChartCalibrationTrainer:
             progress_bar = tqdm(self.val_dataloader, desc="Validating")
             
             for batch_idx, batch in enumerate(progress_bar):
-                # 准备输入和目标
                 images = batch['image'].to(self.device)
                 metadata = batch['metadata']
                 
-                # 从元数据中提取标注
                 targets = self._extract_targets_from_metadata(metadata)
                 if targets is None:
                     continue
@@ -224,20 +177,11 @@ class ChartCalibrationTrainer:
                 targets = {k: v.to(self.device) if isinstance(v, torch.Tensor) else v 
                            for k, v in targets.items()}
                 
-                # 前向传播
                 outputs = self.model(images)
-                
-                # 添加模型引用到预测中
                 outputs['model'] = self.model
-                
-                # 计算损失
                 loss_dict = self.criterion(outputs, targets)
                 loss = loss_dict['total_loss']
-                
-                # 更新进度条
                 progress_bar.set_postfix({'val_loss': f"{loss.item():.4f}"})
-                
-                # 累加损失
                 val_loss += loss.item()
                 for k, v in loss_dict.items():
                     if k in val_metrics:
@@ -257,7 +201,6 @@ class ChartCalibrationTrainer:
         for k in val_metrics:
             val_metrics[k] /= num_batches
         
-        # 更新学习率调度器
         if self.scheduler is not None:
             if isinstance(self.scheduler, torch.optim.lr_scheduler.ReduceLROnPlateau):
                 self.scheduler.step(val_loss)
@@ -268,22 +211,10 @@ class ChartCalibrationTrainer:
         return val_metrics
     
     def _extract_targets_from_metadata(self, metadata: List[Dict]) -> Optional[Dict[str, torch.Tensor]]:
-        """
-        从元数据中提取训练目标
-        
-        参数:
-            metadata: 批次元数据列表
-            
-        返回:
-            目标字典，如果没有可用标注则返回None
-        """
         batch_size = len(metadata)
-        
-        # 检查是否有校准数据
         has_calibration = all('calibration' in m for m in metadata)
         
         if has_calibration:
-            # 从校准数据中提取参考点和变换矩阵
             control_points = []
             transform_params = []
             world_points = []
@@ -301,10 +232,8 @@ class ChartCalibrationTrainer:
                 
                 control_points.append(ref_points_norm)
                 
-                # 提取变换矩阵参数
                 matrix = np.array(cal['transformation_matrix'])
                 
-                # 根据模型的变换类型提取参数
                 if self.model.transformation_type == 'affine':
                     params = matrix[:2, :].flatten()
                 else:  # perspective
@@ -312,7 +241,6 @@ class ChartCalibrationTrainer:
                 
                 transform_params.append(params)
                 
-                # 提取世界坐标点（如果有）
                 if 'world_points' in cal:
                     world_points.append(np.array(cal['world_points']))
             
@@ -341,15 +269,6 @@ class ChartCalibrationTrainer:
         return None
     
     def _build_targets_from_landmarks(self, metadata: List[Dict]) -> Optional[Dict[str, torch.Tensor]]:
-        """
-        从特征点构建训练目标
-        
-        参数:
-            metadata: 批次元数据列表
-            
-        返回:
-            目标字典，如果不能构建则返回None
-        """
         batch_size = len(metadata)
         num_control_points = self.model.num_control_points
         
@@ -361,19 +280,15 @@ class ChartCalibrationTrainer:
             
             # 找出匹配到地理特征的点
             matched_landmarks = [lm for lm in landmarks if 'matched_feature' in lm]
-            
-            # 如果匹配点不够，返回None
             if len(matched_landmarks) < num_control_points:
                 return None
             
-            # 选择最可靠的匹配点
             selected_landmarks = sorted(
                 matched_landmarks, 
                 key=lambda x: x.get('response', 0) if x['type'] == 'keypoint' else x.get('confidence', 0),
                 reverse=True
             )[:num_control_points]
             
-            # 提取像素坐标
             points = np.array([[lm['x'], lm['y']] for lm in selected_landmarks])
             
             # 归一化到[0,1]范围
@@ -390,7 +305,6 @@ class ChartCalibrationTrainer:
             for lm in selected_landmarks:
                 feature = lm['matched_feature']
                 if feature['type'] == 'runway':
-                    # 对于跑道，使用中点
                     lat1, lon1 = feature['latitude_start'], feature['longitude_start']
                     lat2, lon2 = feature['latitude_end'], feature['longitude_end']
                     lat = (lat1 + lat2) / 2
@@ -398,13 +312,11 @@ class ChartCalibrationTrainer:
                 elif feature['type'] == 'navaid':
                     lat, lon = feature['latitude'], feature['longitude']
                 else:
-                    # 其他类型，暂不支持
                     continue
                 geo_coords.append([lon, lat])  # 注意顺序是 [lon, lat]
             
             geo_points.append(np.array(geo_coords))
         
-        # 将所有样本转换为Tensor
         targets = {
             'control_points': torch.tensor(control_points, dtype=torch.float32),
             'world_points': torch.tensor(geo_points, dtype=torch.float32)
@@ -417,16 +329,6 @@ class ChartCalibrationTrainer:
                              pred_points: torch.Tensor, 
                              target_points: Optional[torch.Tensor],
                              batch_idx: int):
-        """
-        可视化预测的控制点
-        
-        参数:
-            image: 输入图像
-            pred_points: 预测的控制点 [num_points, 2]
-            target_points: 目标控制点 [num_points, 2]（可选）
-            batch_idx: 批次索引
-        """
-        # 转换为numpy数组
         img = image.cpu().permute(1, 2, 0).numpy()
         
         # 反归一化图像
@@ -435,13 +337,9 @@ class ChartCalibrationTrainer:
         img = img * std + mean
         img = np.clip(img, 0, 1)
         
-        # 创建图像
         plt.figure(figsize=(10, 10))
-        plt.imshow(img)
-        
+        plt.imshow(img)    
         height, width = img.shape[:2]
-        
-        # 绘制预测点
         pred_points_np = pred_points.cpu().numpy()
         plt.scatter(
             pred_points_np[:, 0] * width, 
@@ -467,7 +365,6 @@ class ChartCalibrationTrainer:
         plt.legend()
         plt.title('Control Points Visualization')
         
-        # 保存到TensorBoard
         self.writer.add_figure(
             f'validation/control_points_{batch_idx}', 
             plt.gcf(), 
@@ -477,31 +374,20 @@ class ChartCalibrationTrainer:
         plt.close()
     
     def train(self):
-        """
-        训练模型指定的轮数
-        """
-        logger.info(f"开始训练，共{self.num_epochs}个Epoch")
-        
         for epoch in range(self.current_epoch, self.num_epochs):
             self.current_epoch = epoch
             
-            # 训练一个Epoch
             start_time = time.time()
             train_metrics = self.train_one_epoch()
             train_time = time.time() - start_time
             
-            # 验证
             val_metrics = self.validate()
             
-            # 记录指标
             self.writer.add_scalar('epoch/train_loss', train_metrics['loss'], epoch)
             self.writer.add_scalar('epoch/val_loss', val_metrics['loss'], epoch)
-            
-            # 记录学习率
             current_lr = self.optimizer.param_groups[0]['lr']
             self.writer.add_scalar('epoch/learning_rate', current_lr, epoch)
             
-            # 打印Epoch统计信息
             logger.info(
                 f"Epoch {epoch+1}/{self.num_epochs} "
                 f"- Train Loss: {train_metrics['loss']:.4f} "
@@ -528,15 +414,6 @@ class ChartCalibrationTrainer:
         return self.best_model_path
     
     def _save_checkpoint(self, is_best: bool) -> str:
-        """
-        保存检查点
-        
-        参数:
-            is_best: 是否是最佳模型
-            
-        返回:
-            保存的检查点路径
-        """
         checkpoint = {
             'epoch': self.current_epoch + 1,
             'model_state_dict': self.model.state_dict(),
@@ -546,15 +423,11 @@ class ChartCalibrationTrainer:
             'config': self.config
         }
         
-        # 保存最新检查点
         latest_path = self.checkpoint_dir / f"checkpoint_latest.pth"
         torch.save(checkpoint, latest_path)
-        
-        # 保存特定Epoch的检查点
         epoch_path = self.checkpoint_dir / f"checkpoint_epoch_{self.current_epoch+1}.pth"
         torch.save(checkpoint, epoch_path)
         
-        # 如果是最佳模型，额外保存一个副本
         if is_best:
             best_path = self.checkpoint_dir / "checkpoint_best.pth"
             torch.save(checkpoint, best_path)
@@ -563,12 +436,6 @@ class ChartCalibrationTrainer:
         return str(epoch_path)
     
     def load_checkpoint(self, checkpoint_path: str):
-        """
-        加载检查点
-        
-        参数:
-            checkpoint_path: 检查点路径
-        """
         logger.info(f"加载检查点: {checkpoint_path}")
         
         checkpoint = torch.load(checkpoint_path, map_location=self.device)
@@ -589,15 +456,6 @@ class ChartCalibrationTrainer:
         logger.info(f"成功加载检查点，从Epoch {self.current_epoch}继续训练")
     
     def evaluate(self, test_dataloader: DataLoader) -> Dict[str, float]:
-        """
-        在测试集上评估模型
-        
-        参数:
-            test_dataloader: 测试数据加载器
-            
-        返回:
-            包含评估指标的字典
-        """
         self.model.eval()
         test_loss = 0.0
         test_metrics = {
@@ -616,12 +474,10 @@ class ChartCalibrationTrainer:
             progress_bar = tqdm(test_dataloader, desc="Testing")
             
             for batch_idx, batch in enumerate(progress_bar):
-                # 准备输入和目标
                 images = batch['image'].to(self.device)
                 metadata = batch['metadata']
                 chart_paths = batch['chart_path']
                 
-                # 从元数据中提取标注
                 targets = self._extract_targets_from_metadata(metadata)
                 if targets is None:
                     continue
@@ -629,40 +485,28 @@ class ChartCalibrationTrainer:
                 targets = {k: v.to(self.device) if isinstance(v, torch.Tensor) else v 
                            for k, v in targets.items()}
                 
-                # 前向传播
                 outputs = self.model(images)
-                
-                # 添加模型引用到预测中
                 outputs['model'] = self.model
-                
-                # 计算损失
                 loss_dict = self.criterion(outputs, targets)
                 loss = loss_dict['total_loss']
-                
-                # 累加损失
                 test_loss += loss.item()
                 for k, v in loss_dict.items():
                     if k in test_metrics:
                         test_metrics[k] += v.item()
-                
-                # 计算像素误差
                 pred_points = outputs['control_points']
                 target_points = targets['control_points']
                 pixel_error = torch.norm(pred_points - target_points, dim=2).mean().item() * 1024  # 假设1024x1024
                 test_metrics['pixel_error'] += pixel_error
                 
-                # 如果有地理坐标，计算地理误差
                 if 'world_points' in targets:
                     # 获取变换矩阵
                     transform_matrix = self.model.get_transformation_matrix(outputs['transform_params'])
                     
-                    # 计算变换后的控制点
                     warped_points = self.model.compute_warped_control_points(
                         outputs['control_points'],
                         transform_matrix
                     )
                     
-                    # 计算地理坐标误差（以度为单位）
                     geo_error = torch.norm(warped_points - targets['world_points'], dim=2).mean().item()
                     test_metrics['geo_error'] += geo_error
                 
@@ -676,7 +520,6 @@ class ChartCalibrationTrainer:
                     batch_idx
                 )
                 
-                # 尝试保存校准结果到数据库
                 for i, m in enumerate(metadata):
                     if 'id' in m:
                         chart_id = m['id']
@@ -735,17 +578,6 @@ class ChartCalibrationTrainer:
                               chart_path: str,
                               metadata: Dict,
                               batch_idx: int):
-        """
-        可视化测试结果
-        
-        参数:
-            image: 输入图像
-            pred_points: 预测的控制点 [num_points, 2]
-            target_points: 目标控制点 [num_points, 2]
-            chart_path: 图表路径
-            metadata: 元数据
-            batch_idx: 批次索引
-        """
         # 转换为numpy数组
         img = image.cpu().permute(1, 2, 0).numpy()
         
@@ -755,7 +587,6 @@ class ChartCalibrationTrainer:
         img = img * std + mean
         img = np.clip(img, 0, 1)
         
-        # 创建图像
         fig, ax = plt.subplots(figsize=(12, 12))
         ax.imshow(img)
         
@@ -772,7 +603,6 @@ class ChartCalibrationTrainer:
             label='预测点'
         )
         
-        # 绘制目标点
         target_points_np = target_points.cpu().numpy()
         ax.scatter(
             target_points_np[:, 0] * width, 
@@ -783,9 +613,7 @@ class ChartCalibrationTrainer:
             label='目标点'
         )
         
-        # 添加图表信息
         chart_name = Path(chart_path).stem
-        ax.set_title(f"图表: {chart_name}")
         
         # 添加误差信息
         pixel_error = np.mean(np.sqrt(np.sum((pred_points_np - target_points_np)**2, axis=1))) * width
@@ -797,7 +625,6 @@ class ChartCalibrationTrainer:
             verticalalignment='top'
         )
         
-        # 如果有地理坐标，添加地理误差信息
         if 'calibration' in metadata:
             ax.text(
                 0.02, 0.94, 
@@ -808,15 +635,11 @@ class ChartCalibrationTrainer:
             )
         
         ax.legend()
-        
-        # 保存到文件
         output_dir = Path("test_results")
         output_dir.mkdir(exist_ok=True, parents=True)
         
         output_path = output_dir / f"{chart_name}_test_{batch_idx}.png"
         plt.savefig(output_path, dpi=100, bbox_inches='tight')
-        
-        # 保存到TensorBoard
         self.writer.add_figure(
             f'test/results_{batch_idx}', 
             fig, 

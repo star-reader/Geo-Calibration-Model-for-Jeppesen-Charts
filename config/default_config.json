@@ -1,0 +1,37 @@
+{
+  "seed": 42,
+  "db_path": "database/aviation.db",
+  
+  "backbone": "resnet50",
+  "pretrained": true,
+  "num_control_points": 4,
+  "transformation_type": "perspective",
+  
+  "train_airport": "ZBAA",
+  "train_chart_type": null,
+  "val_airport": "KSFO",
+  "val_chart_type": null,
+  "test_airport": "EGLL",
+  "test_chart_type": null,
+  
+  "batch_size": 8,
+  "num_workers": 4,
+  "image_size": [1024, 1024],
+  
+  "learning_rate": 0.001,
+  "weight_decay": 1e-5,
+  "num_epochs": 50,
+  
+  "point_weight": 1.0,
+  "transform_weight": 1.0,
+  "consistency_weight": 0.5,
+  "smoothness_weight": 0.1,
+  
+  "checkpoint_dir": "checkpoints",
+  "tensorboard_dir": "runs",
+  "output_dir": "output",
+  
+  "device": "cuda",
+  "visualize": true,
+  "save_results": true
+}

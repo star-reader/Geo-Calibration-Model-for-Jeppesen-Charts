@@ -154,69 +154,6 @@ class AviationDatabase:
         # Add sample data
         self._add_sample_data()
     
-    def _add_sample_data(self):
-        """Add sample data to the database for testing."""
-        conn = sqlite3.connect(self.db_path)
-        cursor = conn.cursor()
-        
-        # Sample airports
-        airports = [
-            ('KSFO', 'SFO', 'San Francisco International Airport', 37.6188, -122.3750, 13, 'San Francisco', 'United States', 'NA'),
-            ('KJFK', 'JFK', 'John F Kennedy International Airport', 40.6399, -73.7787, 13, 'New York', 'United States', 'NA'),
-            ('EGLL', 'LHR', 'London Heathrow Airport', 51.4775, -0.4614, 83, 'London', 'United Kingdom', 'EU'),
-            ('RJTT', 'HND', 'Tokyo Haneda International Airport', 35.5533, 139.7810, 35, 'Tokyo', 'Japan', 'AS'),
-            ('ZBAA', 'PEK', 'Beijing Capital International Airport', 40.0799, 116.6031, 116, 'Beijing', 'China', 'AS')
-        ]
-        
-        cursor.executemany('INSERT INTO airports VALUES (?,?,?,?,?,?,?,?,?)', airports)
-        
-        # Sample runways
-        runways = [
-            (None, 'KSFO', '01L/19R', 11870, 200, 'ASPH-CONC', 1, 0, 37.6188, -122.3750, 37.6388, -122.3750, 13),
-            (None, 'KSFO', '01R/19L', 11381, 200, 'ASPH-CONC', 1, 0, 37.6188, -122.3770, 37.6388, -122.3770, 13),
-            (None, 'KJFK', '04L/22R', 12079, 200, 'ASPH-CONC', 1, 0, 40.6399, -73.7787, 40.6599, -73.7587, 13),
-            (None, 'EGLL', '09L/27R', 12799, 164, 'ASPH-CONC', 1, 0, 51.4775, -0.4614, 51.4775, -0.4414, 83),
-            (None, 'RJTT', '16L/34R', 11024, 196, 'ASPH-CONC', 1, 0, 35.5533, 139.7810, 35.5733, 139.7810, 35)
-        ]
-        
-        cursor.executemany('INSERT INTO runways VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)', runways)
-        
-        # Sample navaids
-        navaids = [
-            (None, 'SFO', 'SAN FRANCISCO VOR/DME', 'VOR/DME', 116.8, 37.6188, -122.3750, 13, 'KSFO'),
-            (None, 'JFK', 'KENNEDY VOR/DME', 'VOR/DME', 115.9, 40.6399, -73.7787, 13, 'KJFK'),
-            (None, 'LHR', 'LONDON VOR/DME', 'VOR/DME', 113.6, 51.4775, -0.4614, 83, 'EGLL'),
-            (None, 'HND', 'TOKYO VOR/DME', 'VOR/DME', 112.2, 35.5533, 139.7810, 35, 'RJTT'),
-            (None, 'PEK', 'BEIJING VOR/DME', 'VOR/DME', 116.4, 40.0799, 116.6031, 116, 'ZBAA')
-        ]
-        
-        cursor.executemany('INSERT INTO navaids VALUES (?,?,?,?,?,?,?,?,?)', navaids)
-        
-        # Sample waypoints
-        waypoints = [
-            (None, 'DUMBA', 'RNAV', 37.7000, -122.5000, 'NA'),
-            (None, 'FIMLA', 'RNAV', 40.7000, -73.9000, 'NA'),
-            (None, 'GEGMU', 'RNAV', 51.5000, -0.5000, 'EU'),
-            (None, 'AROSA', 'RNAV', 35.6000, 139.8000, 'AS'),
-            (None, 'BOBAK', 'RNAV', 40.1000, 116.7000, 'AS')
-        ]
-        
-        cursor.executemany('INSERT INTO waypoints VALUES (?,?,?,?,?,?)', waypoints)
-        
-        # Sample charts
-        charts = [
-            (None, 'KSFO', 'SID', 'OFFSHORE ONE DEPARTURE', 'charts/KSFO_SID_OFFSHORE1.png', 0),
-            (None, 'KSFO', 'STAR', 'DYAMD TWO ARRIVAL', 'charts/KSFO_STAR_DYAMD2.png', 0),
-            (None, 'KSFO', 'IAP', 'ILS OR LOC RWY 28L', 'charts/KSFO_IAP_ILS28L.png', 0),
-            (None, 'KSFO', 'APD', 'AIRPORT DIAGRAM', 'charts/KSFO_APD.png', 0),
-            (None, 'KJFK', 'APD', 'AIRPORT DIAGRAM', 'charts/KJFK_APD.png', 0)
-        ]
-        
-        cursor.executemany('INSERT INTO charts VALUES (?,?,?,?,?,?)', charts)
-        
-        conn.commit()
-        conn.close()
-    
     def get_connection(self):
         """Get a connection to the database."""
         return sqlite3.connect(self.db_path)
@@ -275,8 +212,7 @@ class AviationDatabase:
         
         conn = self.get_connection()
         
-        # Approximate 1 degree latitude = 60 nautical miles
-        # Approximate 1 degree longitude = 60 * cos(latitude) nautical miles
+        # 算一下距离
         lat_delta = radius_nm / 60.0
         lon_delta = radius_nm / (60.0 * np.cos(np.radians(lat)))
         
@@ -301,7 +237,7 @@ class AviationDatabase:
     
     def _haversine(self, lat1, lon1, lat2, lon2):
         """Calculate distance between points in nautical miles."""
-        R = 3440.065  # Earth radius in nautical miles
+        R = 3440.065  # 海里
         
         lat1, lon1, lat2, lon2 = map(np.radians, [lat1, lon1, lat2, lon2])
         
@@ -318,14 +254,13 @@ class AviationDatabase:
         conn = self.get_connection()
         cursor = conn.cursor()
         
-        # Convert numpy arrays to string
+        # 把numpy数组转成string
         if isinstance(transformation_matrix, np.ndarray):
             transformation_matrix = transformation_matrix.tolist()
         
         import json
         from datetime import datetime
         
-        # Update calibration data
         cursor.execute(
             '''
             INSERT OR REPLACE INTO chart_calibration
@@ -341,7 +276,7 @@ class AviationDatabase:
             )
         )
         
-        # Mark chart as calibrated
+        # 标记一下calibrated
         cursor.execute(
             "UPDATE charts SET calibrated = 1 WHERE id = ?",
             (chart_id,)
