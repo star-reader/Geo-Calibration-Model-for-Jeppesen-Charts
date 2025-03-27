@@ -115,4 +115,4 @@ python main.py batch --config config/default_config.json --dir path/to/charts/
 
 ## 协议
 
-MIT
+GPL协议
