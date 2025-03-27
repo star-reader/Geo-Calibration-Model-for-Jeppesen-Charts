@@ -22,10 +22,6 @@
 ## 安装
 
 ```bash
-# 克隆仓库
-git clone https://github.com/yourusername/jeppesen-chart-geo-calibration.git
-cd jeppesen-chart-geo-calibration
-
 # 安装依赖
 pip install -r requirements.txt
 
